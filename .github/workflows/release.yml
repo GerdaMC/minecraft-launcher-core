@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - master
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    if: github.event.pull_request.merged && github.head_ref == 'prepare-release' && github.event.pull_request.user.login == 'github-actions[bot]'
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.sha	}}
+      - name: Use Node.js 15
+        uses: actions/setup-node@v2
+        with:
+          node-version: 15
+          registry-url: 'https://registry.npmjs.org'
+      - name: Use pnpm
+        run: curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm
+      - name: Install
+        run: |
+          pnpm install
+        env:
+          CI: true
+      - name: Compile All
+        run: |
+          pnpm run compile
+      - name: Publish
+        run: |
+          git reset --hard
+          pnpm run publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+      - name: Publish Tag
+        run: |
+          node --eval "console.log(JSON.parse(require('fs').readFileSync('package.json').toString()).version)" > tag.log
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/GerdaMC/minecraft-launcher-core.git"
+          git config user.name FOTONTV
+          git config user.email obraztsov568@gmail.com
+          git tag -f $(cat tag.log)
+          git push origin tag $(cat tag.log) -f
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Delete PR head branch
+        uses: dawidd6/action-delete-branch@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: prepare-release
+          be_kind: true # don't fail on errors (optional)

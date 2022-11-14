@@ -1,0 +1,44 @@
+name: Deploy Github Pages
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'docs/**'
+jobs:
+  page-deploy:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [15]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2-beta
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Use pnpm
+        run: curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm
+      - name: Install
+        run: |
+          pnpm install
+        env:
+          CI: true
+      - name: Build Github Pages
+        working-directory: "./docs"
+        run: |
+          npm run build:web
+      - name: Build Typedoc documentation
+        working-directory: "./docs"
+        run: |
+          npm run build:docs
+      - name: Deploy to Github Pages
+        uses: crazy-max/ghaction-github-pages@v1
+        with:
+          target_branch: gh-pages
+          build_dir: docs/build
+        env:
+          GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
